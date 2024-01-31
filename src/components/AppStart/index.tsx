@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getDappListData, activeDapp } from '../../API/index'
 import './index.scss'
+
+import { renderZipTree } from '../../utils/renderZip'
 interface AppStartProps {
   name: string;
   icon: string;
@@ -9,6 +11,7 @@ interface AppStartProps {
 }
 const AppStart = () => {
   const [appList, setAppList] = useState<AppStartProps[]>([])
+  const iframeUrl = useRef<HTMLIFrameElement>(null)
   useEffect(() => {
     const fetchData = async () => {
       const { data } = await getDappListData()
@@ -19,7 +22,10 @@ const AppStart = () => {
 
   const handleActiveApps = async (e: AppStartProps) => {
     const { data } = await activeDapp(e.zipName)
-    console.log(data)
+
+    const html = await renderZipTree(data)
+    const iframeDom = iframeUrl.current
+    iframeDom!.contentWindow!.document.write(html)
   }
 
   return (
@@ -36,7 +42,9 @@ const AppStart = () => {
           )
         })}
       </div>
-      <div className='workspace'></div>
+      <div className='workspace'>
+        <iframe src="about:blank" ref={iframeUrl}></iframe>
+      </div>
     </div>
   );
 }
