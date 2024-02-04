@@ -2,12 +2,25 @@ import React, { useState, useEffect, useRef } from 'react';
 import { getDappListData, activeDapp } from '../../API/index'
 import './index.scss'
 
+import platformApi from '../../PlatformAPI/index'
+
 import { renderZipTree } from '../../utils/renderZip'
 interface AppStartProps {
   name: string;
   icon: string;
   id: string;
   zipName: string;
+}
+
+// 定义appStartApi的类型
+type AppStartApiType = {
+  getUser: (data?: any) => Promise<unknown>;
+  getSystemConfig: (data?: any) => Promise<unknown>;
+};
+interface EventData {
+  name: string;
+  uuid: string;
+  data: any;
 }
 const AppStart = () => {
   const [appList, setAppList] = useState<AppStartProps[]>([])
@@ -20,6 +33,50 @@ const AppStart = () => {
 
   // 当前登录用户
   const [user, setUser] = useState<any>(null)
+  const userRef = useRef(user); // 使用useRef来跟踪最新的user状态
+
+  const appStartApi: AppStartApiType = {
+    ...platformApi,
+    // 获取用户信息
+    getUser: async (...args: any[]) => {
+      return new Promise((resolve, reject) => {
+        resolve(userRef.current);
+      })
+    },
+  }
+
+  // 类型保护函数
+  function isKeyOfAppStartApi(key: string): key is keyof AppStartApiType {
+    return key in appStartApi;
+  }
+
+  // 响应iframe发送的消息
+  async function receiveMessage(event: MessageEvent<EventData>) {
+    // 是否是提供的API
+    const isPlatformApi = isKeyOfAppStartApi(event.data.name)
+    console.log('是否平台提供的API', appStartApi, isPlatformApi)
+    if (isPlatformApi) {
+      const methodName = event.data.name as keyof AppStartApiType;  // 我们已经检查了event.data.name是一个合法的键，可以使用类型断言
+      const resData = {
+        command: event.data.name + event.data.uuid,
+        response: await appStartApi[methodName](event.data.data)
+      }
+      // 发送数据
+      console.log('父页面发送数据', resData);
+      if (event.source) {
+        event.source.postMessage(resData, {
+          targetOrigin: event.origin
+        });
+      }
+    } else {
+      console.log('不是平台提供的API')
+      // 如果不是平台提供的API，就是自定义的API
+      if (event.data.name === 'loginUserChange_Callback') {
+        setIsSwitching(false); // 切换成功
+      }
+    }
+  }
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -31,9 +88,12 @@ const AppStart = () => {
   }, [])
 
   useEffect(() => {
+    userRef.current = user; // 更新ref的值
     const iframeDom = iframeUrl.current
     iframeDom!.onload = () => {
-
+      window.addEventListener('message', async (e) => {
+        await receiveMessage(e)
+      });
       const params = {
         type: 'loginUserChange',
         data: user,
@@ -78,13 +138,6 @@ const AppStart = () => {
     setIsSwitching(true); // 开始切换账号
     setSwitchCount(switchCount + 1); // 触发useEffect
     setIframeContent('')
-    // 接收到iframe的消息
-    window.addEventListener('message', (e) => {
-      const { type, } = e.data
-      if (type === 'loginUserChange_Callback') {
-        setIsSwitching(false); // 切换成功
-      }
-    })
   }
 
   useEffect(() => {
