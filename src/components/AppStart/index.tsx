@@ -106,9 +106,10 @@ const AppStart = () => {
 
   const handleActiveApps = async (e: AppStartProps) => {
     const { data } = await activeDapp(e.zipName)
-    const html = await renderZipTree(data)
-    const iframeDom = iframeUrl.current
-    iframeDom!.contentWindow!.document.write(html)
+    console.log('🚀  file: index.tsx:109  handleActiveApps  data:', data)
+    // const html = await renderZipTree(data)
+    // const iframeDom = iframeUrl.current
+    // iframeDom!.contentWindow!.document.write(html)
   }
 
 
